@@ -14,9 +14,15 @@ Secure backup. Saves and protects the posts in the destination chat from possibl
 
 ### via command line
 
-Command: python clonechat.py --orig={chat_id of source channel/group} --dest=-{chat_id of destination channel/group}
+Command: 
+```bash
+python clonechat.py --orig={chat_id of source channel/group} --dest=-{chat_id of destination channel/group} --copy={True if copy messages/ False if forward messages}
+```
 
-Example: python clonechat.py --orig=-100222222 --dest=-10011111111
+Example: 
+```bash
+python clonechat.py --orig=-100222222 --dest=-10011111111 --cope=false
+```
 
 ### Via menu in terminal
 
