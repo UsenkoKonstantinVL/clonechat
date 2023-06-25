@@ -1,5 +1,11 @@
 # Clonechat
 
+---
+**This is fork** from https://github.com/apenasrr/clonechat.
+This fork ***forward*** or ***copy*** history of a Telegram Channel/Group to another Channel/Group.
+
+
+---
 Clone all posts from the history of a Telegram Channel/Group to another Channel/Group.
 
 Secure backup. Saves and protects the posts in the destination chat from possible deletion of posts from the source chat.
