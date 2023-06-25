@@ -6,6 +6,7 @@ import os
 import time
 from configparser import ConfigParser
 from pathlib import Path
+import time
 
 import pyrogram
 from pyrogram.errors import ChannelInvalid, FloodWait, PeerIdInvalid
@@ -13,6 +14,7 @@ from pyrogram.errors import ChannelInvalid, FloodWait, PeerIdInvalid
 from setup import version
 
 DELAY_AMOUNT = 10
+COPY_MESSAGES = False
 
 
 def get_config_data(path_file_config):
@@ -461,6 +463,7 @@ def check_chat_id(chat_id):
     try:
         chat_obj = tg.get_chat(chat_id)
         chat_title = chat_obj.title
+        print(f"Chat tittle: {chat_title}")
         return chat_title
     except ChannelInvalid:  # When you are not part of the channel
         print("\nNon-accessible chat")
@@ -534,49 +537,60 @@ def main():
         + "github.com/apenasrr/clonechat/\n"
     )
 
-    global FILES_TYPE_EXCLUDED
-    FILES_TYPE_EXCLUDED = get_files_type_excluded()
-    last_message_id = get_last_message_id(origin_chat)
+    messages = list()
 
-    global NEW
-    if NEW is None:
-        int_task_type = task_type()
+    print("Checking messages")
+
+    counter = 0
+    for message in tg.get_chat_history(destination_chat):
+        counter += 1
+
+    for message in tg.get_chat_history(origin_chat):
+        messages.append(message)
+
+    new_messages = list()
+
+    for i, message in enumerate(reversed(messages)):
+        if i < counter:
+            continue
+
+        new_messages.append(message)
+
+    if COPY_MESSAGES:
+        messages_id = [message.id for message in new_messages]
+        print("Forwarding messages")
+        forward_messages(messages_id)
     else:
-        int_task_type = NEW
-    list_posted = get_list_posted(int_task_type)
-
-    message_id = get_first_message_id(list_posted)
-    while message_id < last_message_id:
-        message_id = message_id + 1
-        if message_id in list_posted:
-            continue
-
-        message = get_message(origin_chat, message_id)
-
-        if is_empty_message(message, message_id, last_message_id):
-            list_posted += [message.id]
-            continue
-
-        func_sender = get_sender(message)
-
-        if must_be_ignored(func_sender, message_id, last_message_id):
-            list_posted += [message.id]
-            update_cache(CACHE_FILE, list_posted)
-            continue
-
-        func_sender(message, destination_chat)
-        print(f"{message_id}/{last_message_id}")
-
-        list_posted += [message.id]
-        update_cache(CACHE_FILE, list_posted)
-
-        wait_a_moment(message_id)
+        copy_messages(new_messages)
 
     print(
         "\nChat cloning finished! :)\n"
         + "If you are not going to continue this task for these chats, "
         + "delete the posted.json file"
     )
+
+
+def copy_messages(messages):
+    for message in messages:
+        try:
+            tg.copy_message(destination_chat, origin_chat, message.id, caption=f"{message.from_user.username}: {str(message.date)}")
+        except FloodWait as e:
+            print(f"Got flood error, waiting for {e.value} seconds")
+            time.sleep(e.value)  # Wait "value" seconds before continuing
+            tg.copy_message(destination_chat, origin_chat, message.id, caption=f"{message.from_user.username}: {str(message.date)}")
+
+
+def forward_messages(messages_ids):
+    while len(messages_ids) != 0:
+        sending_messages = min(100, len(messages_ids))
+        try:
+            tg.forward_messages(destination_chat, origin_chat, messages_ids[:sending_messages])
+        except FloodWait as e:
+            print(f"Got flood error, waiting for {e.value} seconds")
+            time.sleep(e.value)  # Wait "value" seconds before continuing
+            tg.forward_messages(destination_chat, origin_chat, messages_ids[:sending_messages])
+        messages_ids = messages_ids[sending_messages: ]
+        time.sleep(1.0)
 
 
 config_data = get_config_data(
@@ -590,6 +604,7 @@ SKIP_DELAY_SECONDS = float(config_data.get("skip_delay_seconds"))
 parser = argparse.ArgumentParser()
 parser.add_argument("--orig", help="chat_id of origin channel/group")
 parser.add_argument("--dest", help="chat_id of destination channel/group")
+parser.add_argument("--copy", default=False, type=bool, help="If True copies messages from origin to destination. Else forward messages.")
 parser.add_argument(
     "--mode",
     choices=["user", "bot"],
@@ -618,6 +633,8 @@ if options.mode is None:
 else:
     MODE = options.mode
 
+
+COPY_MESSAGES = options.copy
 
 useraccount = ensure_connection("user")
 print(f"{MODE=}")
@@ -654,12 +671,12 @@ else:  # CLI interface
 if options.dest is None:  # Menu interface
     while True:
         destination_chat = int(input("Enter the destination id_chat:"))
-        DESTINATION_CHAT_TITLE = check_chat_id(origin_chat)
+        DESTINATION_CHAT_TITLE = check_chat_id(destination_chat)
         if DESTINATION_CHAT_TITLE:
             break
 else:  # CLI interface
     destination_chat = int(options.dest)
-    DESTINATION_CHAT_TITLE = check_chat_id(origin_chat)
+    DESTINATION_CHAT_TITLE = check_chat_id(destination_chat)
     if DESTINATION_CHAT_TITLE is False:
         raise AttributeError("Fix the destination chat_id")
 
